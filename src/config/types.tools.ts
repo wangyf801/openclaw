@@ -503,6 +503,16 @@ export type ToolsConfig = {
       userAgent?: string;
       /** Use Readability to extract main content (default: true). */
       readability?: boolean;
+      /** SSRF policy override for web fetch requests. */
+      ssrfPolicy?: {
+        /** Allow private/internal network addresses (default: false). */
+        dangerouslyAllowPrivateNetwork?: boolean;
+        /**
+         * Allow RFC 2544 benchmark range 198.18.0.0/15 (default: false).
+         * Useful for fake-IP proxy environments (Surge/Clash/Shadowrocket/etc).
+         */
+        allowRfc2544BenchmarkRange?: boolean;
+      };
       firecrawl?: {
         /** Enable Firecrawl fallback (default: true when apiKey is set). */
         enabled?: boolean;
