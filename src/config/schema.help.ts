@@ -674,6 +674,10 @@ export const FIELD_HELP: Record<string, string> = {
   "tools.web.fetch.userAgent": "Override User-Agent header for web_fetch requests.",
   "tools.web.fetch.readability":
     "Use Readability to extract main content from HTML (fallbacks to basic HTML cleanup).",
+  "tools.web.fetch.ssrfPolicy.dangerouslyAllowPrivateNetwork":
+    "Allow web_fetch access to private/internal network addresses (default: false).",
+  "tools.web.fetch.ssrfPolicy.allowRfc2544BenchmarkRange":
+    "Allow web_fetch to use RFC 2544 benchmark range (198.18.0.0/15), useful for fake-IP proxy environments.",
   "tools.web.fetch.firecrawl.enabled": "Enable Firecrawl fallback for web_fetch (if configured).",
   "tools.web.fetch.firecrawl.apiKey": "Firecrawl API key (fallback: FIRECRAWL_API_KEY env var).",
   "tools.web.fetch.firecrawl.baseUrl":
