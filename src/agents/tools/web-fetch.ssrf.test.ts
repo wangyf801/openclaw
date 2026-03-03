@@ -3,7 +3,7 @@ import * as ssrf from "../../infra/net/ssrf.js";
 import { type FetchMock, withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 
 const lookupMock = vi.fn();
-const resolvePinnedHostname = ssrf.resolvePinnedHostname;
+const resolvePinnedHostnameWithPolicy = ssrf.resolvePinnedHostnameWithPolicy;
 
 function makeHeaders(map: Record<string, string>): { get: (key: string) => string | null } {
   return {
@@ -39,6 +39,7 @@ function setMockFetch(
 
 async function createWebFetchToolForTest(params?: {
   firecrawl?: { enabled?: boolean; apiKey?: string };
+  ssrfPolicy?: { allowRfc2544BenchmarkRange?: boolean; dangerouslyAllowPrivateNetwork?: boolean };
 }) {
   const { createWebFetchTool } = await import("./web-tools.js");
   return createWebFetchTool({
@@ -48,6 +49,7 @@ async function createWebFetchToolForTest(params?: {
           fetch: {
             cacheTtlMinutes: 0,
             firecrawl: params?.firecrawl ?? { enabled: false },
+            ...(params?.ssrfPolicy ? { ssrfPolicy: params.ssrfPolicy } : {}),
           },
         },
       },
@@ -67,14 +69,17 @@ describe("web_fetch SSRF protection", () => {
   const priorFetch = global.fetch;
 
   beforeEach(() => {
-    vi.spyOn(ssrf, "resolvePinnedHostname").mockImplementation((hostname) =>
-      resolvePinnedHostname(hostname, lookupMock),
+    vi.spyOn(ssrf, "resolvePinnedHostnameWithPolicy").mockImplementation((hostname, options) =>
+      resolvePinnedHostnameWithPolicy(hostname, {
+        ...options,
+        lookupFn: lookupMock,
+      }),
     );
   });
 
   afterEach(() => {
     global.fetch = priorFetch;
-    lookupMock.mockClear();
+    lookupMock.mockReset();
     vi.restoreAllMocks();
   });
 
@@ -114,6 +119,36 @@ describe("web_fetch SSRF protection", () => {
 
     await expectBlockedUrl(tool, "https://private.test/resource", /private|internal|blocked/i);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("blocks RFC2544 benchmark fake-IP addresses by default", async () => {
+    lookupMock.mockResolvedValue([{ address: "198.18.0.187", family: 4 }]);
+
+    const fetchSpy = setMockFetch();
+    const tool = await createWebFetchToolForTest();
+
+    await expectBlockedUrl(
+      tool,
+      "https://fake-ip-proxied.test/resource",
+      /private|internal|blocked/i,
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("allows RFC2544 benchmark fake-IP addresses when configured", async () => {
+    lookupMock.mockResolvedValue([{ address: "198.18.0.187", family: 4 }]);
+
+    const fetchSpy = setMockFetch().mockResolvedValue(textResponse("ok"));
+    const tool = await createWebFetchToolForTest({
+      ssrfPolicy: { allowRfc2544BenchmarkRange: true },
+    });
+
+    const result = await tool?.execute?.("call", { url: "https://fake-ip-proxied.test/resource" });
+    expect(fetchSpy).toHaveBeenCalled();
+    expect(result?.details).toMatchObject({
+      status: 200,
+      extractor: "raw",
+    });
   });
 
   it("blocks redirects to private hosts", async () => {
