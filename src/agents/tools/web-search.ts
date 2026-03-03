@@ -187,13 +187,13 @@ function createWebSearchSchema(provider: (typeof SEARCH_PROVIDERS)[number]) {
       search_lang: Type.Optional(
         Type.String({
           description:
-            "Brave language code for search results (e.g., 'en', 'de', 'en-gb', 'zh-hans', 'zh-hant', 'pt-br').",
+            "Brave language code for search results (e.g., 'en', 'de', 'en-gb', 'zh-hans', 'zh-hant', 'pt-br'). Chinese aliases like zh/zh-CN/zh-TW/zh-HK are auto-normalized.",
         }),
       ),
       ui_lang: Type.Optional(
         Type.String({
           description:
-            "Locale code for UI elements in language-region format (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Must include region subtag.",
+            "Locale code for UI elements in language-region format (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Chinese aliases zh/zh-CN/zh-TW/zh-HK are supported.",
         }),
       ),
     });
@@ -790,11 +790,11 @@ function normalizeBraveSearchLang(value: string | undefined): string | undefined
   if (!value) {
     return undefined;
   }
-  const trimmed = value.trim();
-  if (!trimmed) {
+  const normalized = value.trim().replace(/_/g, "-").toLowerCase();
+  if (!normalized) {
     return undefined;
   }
-  const canonical = BRAVE_SEARCH_LANG_ALIASES[trimmed.toLowerCase()] ?? trimmed.toLowerCase();
+  const canonical = BRAVE_SEARCH_LANG_ALIASES[normalized] ?? normalized;
   if (!BRAVE_SEARCH_LANG_CODES.has(canonical)) {
     return undefined;
   }
@@ -805,11 +805,21 @@ function normalizeBraveUiLang(value: string | undefined): string | undefined {
   if (!value) {
     return undefined;
   }
-  const trimmed = value.trim();
-  if (!trimmed) {
+  const normalized = value.trim().replace(/_/g, "-");
+  if (!normalized) {
     return undefined;
   }
-  const match = trimmed.match(BRAVE_UI_LANG_LOCALE);
+  const lowered = normalized.toLowerCase();
+  if (lowered === "zh" || lowered === "zh-cn" || lowered === "zh-hans") {
+    return "zh-CN";
+  }
+  if (lowered === "zh-tw" || lowered === "zh-hant") {
+    return "zh-TW";
+  }
+  if (lowered === "zh-hk") {
+    return "zh-HK";
+  }
+  const match = normalized.match(BRAVE_UI_LANG_LOCALE);
   if (!match) {
     return undefined;
   }
@@ -1537,14 +1547,15 @@ export function createWebSearchTool(options?: {
         return jsonResult({
           error: "invalid_search_lang",
           message:
-            "search_lang must be a Brave-supported language code like 'en', 'en-gb', 'zh-hans', or 'zh-hant'.",
+            "search_lang must be a Brave-supported language code like 'en', 'en-gb', 'pt-br', 'zh-hans', or 'zh-hant'. Chinese aliases zh/zh-CN/zh-TW/zh-HK are also accepted.",
           docs: "https://docs.openclaw.ai/tools/web",
         });
       }
       if (normalizedBraveLanguageParams.invalidField === "ui_lang") {
         return jsonResult({
           error: "invalid_ui_lang",
-          message: "ui_lang must be a language-region locale like 'en-US'.",
+          message:
+            "ui_lang must be a locale like 'en-US' (Chinese aliases zh/zh-CN/zh-TW/zh-HK are supported).",
           docs: "https://docs.openclaw.ai/tools/web",
         });
       }
