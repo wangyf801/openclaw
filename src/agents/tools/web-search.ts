@@ -46,6 +46,8 @@ const BRAVE_FRESHNESS_SHORTCUTS = new Set(["pd", "pw", "pm", "py"]);
 const BRAVE_FRESHNESS_RANGE = /^(\d{4}-\d{2}-\d{2})to(\d{4}-\d{2}-\d{2})$/;
 const BRAVE_SEARCH_LANG_CODE = /^[a-z]{2}$/i;
 const BRAVE_UI_LANG_LOCALE = /^([a-z]{2})-([a-z]{2})$/i;
+const BRAVE_ZH_HANS_INPUTS = new Set(["zh", "zh-cn", "zh-sg", "zh-hans"]);
+const BRAVE_ZH_HANT_INPUTS = new Set(["zh-tw", "zh-hk", "zh-hant"]);
 
 const WebSearchSchema = Type.Object({
   query: Type.String({ description: "Search query string." }),
@@ -65,13 +67,13 @@ const WebSearchSchema = Type.Object({
   search_lang: Type.Optional(
     Type.String({
       description:
-        "Short ISO language code for search results (e.g., 'de', 'en', 'fr', 'tr'). Must be a 2-letter code, NOT a locale.",
+        "Language code for search results (e.g., 'de', 'en', 'fr', 'tr'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-hans, zh-TW/zh-HK -> zh-hant.",
     }),
   ),
   ui_lang: Type.Optional(
     Type.String({
       description:
-        "Locale code for UI elements in language-region format (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Must include region subtag.",
+        "Locale code for UI elements (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-CN, zh-TW -> zh-TW, zh-HK -> zh-HK.",
     }),
   ),
   freshness: Type.Optional(
@@ -720,22 +722,41 @@ function normalizeBraveSearchLang(value: string | undefined): string | undefined
   if (!value) {
     return undefined;
   }
-  const trimmed = value.trim();
-  if (!trimmed || !BRAVE_SEARCH_LANG_CODE.test(trimmed)) {
+  const normalized = value.trim().replace(/_/g, "-").toLowerCase();
+  if (!normalized) {
     return undefined;
   }
-  return trimmed.toLowerCase();
+  if (BRAVE_ZH_HANS_INPUTS.has(normalized)) {
+    return "zh-hans";
+  }
+  if (BRAVE_ZH_HANT_INPUTS.has(normalized)) {
+    return "zh-hant";
+  }
+  if (!BRAVE_SEARCH_LANG_CODE.test(normalized)) {
+    return undefined;
+  }
+  return normalized;
 }
 
 function normalizeBraveUiLang(value: string | undefined): string | undefined {
   if (!value) {
     return undefined;
   }
-  const trimmed = value.trim();
-  if (!trimmed) {
+  const normalized = value.trim().replace(/_/g, "-");
+  if (!normalized) {
     return undefined;
   }
-  const match = trimmed.match(BRAVE_UI_LANG_LOCALE);
+  const lowered = normalized.toLowerCase();
+  if (lowered === "zh" || lowered === "zh-cn" || lowered === "zh-hans") {
+    return "zh-CN";
+  }
+  if (lowered === "zh-tw" || lowered === "zh-hant") {
+    return "zh-TW";
+  }
+  if (lowered === "zh-hk") {
+    return "zh-HK";
+  }
+  const match = normalized.match(BRAVE_UI_LANG_LOCALE);
   if (!match) {
     return undefined;
   }
@@ -1398,14 +1419,15 @@ export function createWebSearchTool(options?: {
         return jsonResult({
           error: "invalid_search_lang",
           message:
-            "search_lang must be a 2-letter ISO language code like 'en' (not a locale like 'en-US').",
+            "search_lang must be a 2-letter language code (e.g., 'en') or a Chinese variant (zh/zh-CN/zh-TW/zh-HK/zh-hans/zh-hant).",
           docs: "https://docs.openclaw.ai/tools/web",
         });
       }
       if (normalizedBraveLanguageParams.invalidField === "ui_lang") {
         return jsonResult({
           error: "invalid_ui_lang",
-          message: "ui_lang must be a language-region locale like 'en-US'.",
+          message:
+            "ui_lang must be a locale like 'en-US' (Chinese aliases zh/zh-CN/zh-TW/zh-HK are supported).",
           docs: "https://docs.openclaw.ai/tools/web",
         });
       }
