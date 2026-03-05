@@ -42,8 +42,9 @@ const BRAVE_FRESHNESS_SHORTCUTS = new Set(["pd", "pw", "pm", "py"]);
 const BRAVE_FRESHNESS_RANGE = /^(\d{4}-\d{2}-\d{2})to(\d{4}-\d{2}-\d{2})$/;
 const BRAVE_SEARCH_LANG_CODE = /^[a-z]{2}$/i;
 const BRAVE_UI_LANG_LOCALE = /^([a-z]{2})-([a-z]{2})$/i;
-<<<<<<< HEAD
 const PERPLEXITY_RECENCY_VALUES = new Set(["day", "week", "month", "year"]);
+const BRAVE_ZH_HANS_INPUTS = new Set(["zh", "zh-cn", "zh-sg", "zh-hans"]);
+const BRAVE_ZH_HANT_INPUTS = new Set(["zh-tw", "zh-hk", "zh-hant"]);
 
 const FRESHNESS_TO_RECENCY: Record<string, string> = {
   pd: "day",
@@ -128,13 +129,13 @@ function createWebSearchSchema(provider: (typeof SEARCH_PROVIDERS)[number]) {
       search_lang: Type.Optional(
         Type.String({
           description:
-            "Short ISO language code for search results (e.g., 'de', 'en', 'fr', 'tr'). Must be a 2-letter code, NOT a locale.",
+            "Short ISO language code for search results (e.g., 'de', 'en', 'fr', 'tr'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-hans, zh-TW/zh-HK -> zh-hant.",
         }),
       ),
       ui_lang: Type.Optional(
         Type.String({
           description:
-            "Locale code for UI elements in language-region format (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Must include region subtag.",
+            "Locale code for UI elements (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-CN, zh-TW -> zh-TW, zh-HK -> zh-HK.",
         }),
       ),
     });
@@ -168,45 +169,6 @@ function createWebSearchSchema(provider: (typeof SEARCH_PROVIDERS)[number]) {
   // grok, gemini, kimi, etc.
   return Type.Object(baseSchema);
 }
-=======
-const BRAVE_ZH_HANS_INPUTS = new Set(["zh", "zh-cn", "zh-sg", "zh-hans"]);
-const BRAVE_ZH_HANT_INPUTS = new Set(["zh-tw", "zh-hk", "zh-hant"]);
-
-const WebSearchSchema = Type.Object({
-  query: Type.String({ description: "Search query string." }),
-  count: Type.Optional(
-    Type.Number({
-      description: "Number of results to return (1-10).",
-      minimum: 1,
-      maximum: MAX_SEARCH_COUNT,
-    }),
-  ),
-  country: Type.Optional(
-    Type.String({
-      description:
-        "2-letter country code for region-specific results (e.g., 'DE', 'US', 'ALL'). Default: 'US'.",
-    }),
-  ),
-  search_lang: Type.Optional(
-    Type.String({
-      description:
-        "Language code for search results (e.g., 'de', 'en', 'fr', 'tr'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-hans, zh-TW/zh-HK -> zh-hant.",
-    }),
-  ),
-  ui_lang: Type.Optional(
-    Type.String({
-      description:
-        "Locale code for UI elements (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-CN, zh-TW -> zh-TW, zh-HK -> zh-HK.",
-    }),
-  ),
-  freshness: Type.Optional(
-    Type.String({
-      description:
-        "Filter results by discovery time. Brave supports 'pd', 'pw', 'pm', 'py', and date range 'YYYY-MM-DDtoYYYY-MM-DD'. Perplexity supports 'pd', 'pw', 'pm', and 'py'.",
-    }),
-  ),
-});
->>>>>>> aa4d02af6 (fix(web_search): normalize Brave Chinese language aliases)
 
 type WebSearchConfig = NonNullable<OpenClawConfig["tools"]>["web"] extends infer Web
   ? Web extends { search?: infer Search }
