@@ -103,6 +103,8 @@ const BRAVE_SEARCH_LANG_ALIASES: Record<string, string> = {
 };
 const BRAVE_UI_LANG_LOCALE = /^([a-z]{2})-([a-z]{2})$/i;
 const PERPLEXITY_RECENCY_VALUES = new Set(["day", "week", "month", "year"]);
+const BRAVE_ZH_HANS_INPUTS = new Set(["zh", "zh-cn", "zh-sg", "zh-hans"]);
+const BRAVE_ZH_HANT_INPUTS = new Set(["zh-tw", "zh-hk", "zh-hant"]);
 
 const FRESHNESS_TO_RECENCY: Record<string, string> = {
   pd: "day",
@@ -187,13 +189,13 @@ function createWebSearchSchema(provider: (typeof SEARCH_PROVIDERS)[number]) {
       search_lang: Type.Optional(
         Type.String({
           description:
-            "Brave language code for search results (e.g., 'en', 'de', 'en-gb', 'zh-hans', 'zh-hant', 'pt-br'). Chinese aliases like zh/zh-CN/zh-TW/zh-HK are auto-normalized.",
+            "Brave language code for search results (e.g., 'en', 'de', 'fr', 'tr', 'en-gb', 'pt-br', 'zh-hans', 'zh-hant'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-hans, zh-TW/zh-HK -> zh-hant.",
         }),
       ),
       ui_lang: Type.Optional(
         Type.String({
           description:
-            "Locale code for UI elements in language-region format (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Chinese aliases zh/zh-CN/zh-TW/zh-HK are supported.",
+            "Locale code for UI elements in language-region format (e.g., 'en-US', 'de-DE', 'fr-FR', 'tr-TR'). Chinese aliases are auto-normalized: zh/zh-CN -> zh-CN, zh-TW -> zh-TW, zh-HK -> zh-HK.",
         }),
       ),
     });
