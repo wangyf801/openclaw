@@ -83,12 +83,12 @@ export async function executeNodeHostCommand(
     throw err;
   }
   const nodeInfo = nodes.find((entry) => entry.nodeId === nodeId);
-  const supportsSystemRun = Array.isArray(nodeInfo?.commands)
-    ? nodeInfo?.commands?.includes("system.run")
+  const supportsPreparedSystemRun = Array.isArray(nodeInfo?.commands)
+    ? nodeInfo.commands.includes("system.run") && nodeInfo.commands.includes("system.run.prepare")
     : false;
-  if (!supportsSystemRun) {
+  if (!supportsPreparedSystemRun) {
     throw new Error(
-      "exec host=node requires a node that supports system.run (companion app or node host).",
+      "exec host=node requires a node that supports both system.run and system.run.prepare (update or reconnect the companion app/node host).",
     );
   }
   const argv = buildNodeShellCommand(params.command, nodeInfo?.platform);
