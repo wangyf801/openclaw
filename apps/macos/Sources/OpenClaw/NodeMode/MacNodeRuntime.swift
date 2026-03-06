@@ -58,6 +58,8 @@ actor MacNodeRuntime {
                 return try await self.handleLocationInvoke(req)
             case MacNodeScreenCommand.record.rawValue:
                 return try await self.handleScreenRecordInvoke(req)
+            case OpenClawSystemCommand.runPrepare.rawValue:
+                return try await self.handleSystemRunPrepare(req)
             case OpenClawSystemCommand.run.rawValue:
                 return try await self.handleSystemRun(req)
             case OpenClawSystemCommand.which.rawValue:
@@ -432,6 +434,31 @@ actor MacNodeRuntime {
 
             guard poll, Date() < deadline else { return false }
             try? await Task.sleep(nanoseconds: 120_000_000)
+        }
+    }
+
+    private func handleSystemRunPrepare(_ req: BridgeInvokeRequest) async throws -> BridgeInvokeResponse {
+        let params = try Self.decodeParams(OpenClawSystemRunPrepareParams.self, from: req.paramsJSON)
+        let command = params.command.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard !command.isEmpty else {
+            return Self.errorResponse(req, code: .invalidRequest, message: "INVALID_REQUEST: command required")
+        }
+
+        let validated = ExecSystemRunCommandValidator.resolve(command: command, rawCommand: params.rawCommand)
+        switch validated {
+        case let .invalid(message):
+            return Self.errorResponse(req, code: .invalidRequest, message: message)
+        case let .ok(resolved):
+            let payload = OpenClawSystemRunPreparePayload(
+                cmdText: resolved.displayCommand,
+                plan: OpenClawSystemRunApprovalPlan(
+                    argv: command,
+                    cwd: Self.trimmedNonEmpty(params.cwd),
+                    rawCommand: resolved.displayCommand,
+                    agentId: Self.trimmedNonEmpty(params.agentId),
+                    sessionKey: Self.trimmedNonEmpty(params.sessionKey)))
+            let encoded = try Self.encodePayload(payload)
+            return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: encoded)
         }
     }
 
@@ -895,6 +922,11 @@ extension MacNodeRuntime {
             error: result.errorMessage)
         let payload = try Self.encodePayload(runPayload)
         return BridgeInvokeResponse(id: req.id, ok: true, payloadJSON: payload)
+    }
+
+    private static func trimmedNonEmpty(_ value: String?) -> String? {
+        let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private static func decodeParams<T: Decodable>(_ type: T.Type, from json: String?) throws -> T {
