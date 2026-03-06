@@ -615,12 +615,13 @@ export function createNodesTool(options?: {
             }
             const nodeId = resolveNodeIdFromList(nodes, node);
             const nodeInfo = nodes.find((entry) => entry.nodeId === nodeId);
-            const supportsSystemRun = Array.isArray(nodeInfo?.commands)
-              ? nodeInfo?.commands?.includes("system.run")
+            const supportsPreparedSystemRun = Array.isArray(nodeInfo?.commands)
+              ? nodeInfo.commands.includes("system.run") &&
+                nodeInfo.commands.includes("system.run.prepare")
               : false;
-            if (!supportsSystemRun) {
+            if (!supportsPreparedSystemRun) {
               throw new Error(
-                "system.run requires a companion app or node host; the selected node does not support system.run.",
+                "system.run requires a companion app or node host that supports both system.run and system.run.prepare.",
               );
             }
             const commandRaw = params.command;

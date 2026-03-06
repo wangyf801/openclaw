@@ -12,6 +12,28 @@ struct MacNodeRuntimeTests {
         #expect(response.ok == false)
     }
 
+    @Test func handleInvokeSystemRunPrepareReturnsPlan() async throws {
+        let runtime = MacNodeRuntime()
+        let params = OpenClawSystemRunPrepareParams(
+            command: ["echo", "hello world"],
+            rawCommand: #"echo "hello world""#,
+            cwd: "/tmp",
+            agentId: "agent-1",
+            sessionKey: "session-1")
+        let json = try #require(String(data: JSONEncoder().encode(params), encoding: .utf8))
+        let response = await runtime.handleInvoke(
+            BridgeInvokeRequest(id: "req-prepare", command: OpenClawSystemCommand.runPrepare.rawValue, paramsJSON: json))
+        #expect(response.ok == true)
+        let payloadJSON = try #require(response.payloadJSON)
+        let payload = try JSONDecoder().decode(OpenClawSystemRunPreparePayload.self, from: Data(payloadJSON.utf8))
+        #expect(payload.cmdText == #"echo "hello world""#)
+        #expect(payload.plan.argv == ["echo", "hello world"])
+        #expect(payload.plan.cwd == "/tmp")
+        #expect(payload.plan.rawCommand == #"echo "hello world""#)
+        #expect(payload.plan.agentId == "agent-1")
+        #expect(payload.plan.sessionKey == "session-1")
+    }
+
     @Test func handleInvokeRejectsEmptySystemRun() async throws {
         let runtime = MacNodeRuntime()
         let params = OpenClawSystemRunParams(command: [])
