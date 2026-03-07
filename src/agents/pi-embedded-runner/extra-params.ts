@@ -75,10 +75,72 @@ type CacheRetentionStreamOptions = Partial<SimpleStreamOptions> & {
   openaiWsWarmup?: boolean;
 };
 
+/**
+ * Resolve cacheRetention from extraParams, supporting both new `cacheRetention`
+ * and legacy `cacheControlTtl` values for backwards compatibility.
+ *
+ * Mapping: "5m" → "short", "1h" → "long"
+ *
+ * Applies to:
+ * - direct Anthropic provider (auto-defaults to "short")
+ * - Anthropic Claude models on Bedrock when cache retention is explicitly configured
+ * - any custom provider using anthropic-messages API when explicitly configured
+ *
+ * OpenRouter uses openai-completions API with hardcoded cache_control instead
+ * of the cacheRetention stream option.
+ *
+ * Defaults to "short" for direct Anthropic when not explicitly configured.
+ * Custom anthropic-messages providers must opt in via explicit cacheRetention config.
+ */
+function resolveCacheRetention(
+  extraParams: Record<string, unknown> | undefined,
+  provider: string,
+  modelApi?: string,
+): CacheRetention | undefined {
+  const isAnthropicDirect = provider === "anthropic";
+  const hasExplicitConfig =
+    extraParams?.cacheRetention !== undefined || extraParams?.cacheControlTtl !== undefined;
+  const isAnthropicBedrock = provider === "amazon-bedrock" && hasExplicitConfig;
+  // Custom providers using anthropic-messages API can opt in to prompt caching
+  // via explicit cacheRetention config. This enables third-party proxies that
+  // transparently forward to Anthropic to benefit from prompt caching.
+  const isCustomAnthropicApi =
+    !isAnthropicDirect && modelApi === "anthropic-messages" && hasExplicitConfig;
+
+  if (!isAnthropicDirect && !isAnthropicBedrock && !isCustomAnthropicApi) {
+    return undefined;
+  }
+
+  // Prefer new cacheRetention if present
+  const newVal = extraParams?.cacheRetention;
+  if (newVal === "none" || newVal === "short" || newVal === "long") {
+    return newVal;
+  }
+
+  // Fall back to legacy cacheControlTtl with mapping
+  const legacy = extraParams?.cacheControlTtl;
+  if (legacy === "5m") {
+    return "short";
+  }
+  if (legacy === "1h") {
+    return "long";
+  }
+
+  // Default to "short" only for direct Anthropic when not explicitly configured.
+  // Bedrock retains upstream provider defaults unless explicitly set.
+  if (!isAnthropicDirect) {
+    return undefined;
+  }
+
+  // Default to "short" for direct Anthropic when not explicitly configured
+  return "short";
+}
+
 function createStreamFnWithExtraParams(
   baseStreamFn: StreamFn | undefined,
   extraParams: Record<string, unknown> | undefined,
   provider: string,
+  modelApi?: string,
 ): StreamFn | undefined {
   if (!extraParams || Object.keys(extraParams).length === 0) {
     return undefined;
@@ -101,7 +163,7 @@ function createStreamFnWithExtraParams(
   if (typeof extraParams.openaiWsWarmup === "boolean") {
     streamParams.openaiWsWarmup = extraParams.openaiWsWarmup;
   }
-  const cacheRetention = resolveCacheRetention(extraParams, provider);
+  const cacheRetention = resolveCacheRetention(extraParams, provider, modelApi);
   if (cacheRetention) {
     streamParams.cacheRetention = cacheRetention;
   }
@@ -330,6 +392,7 @@ export function applyExtraParamsToAgent(
   extraParamsOverride?: Record<string, unknown>,
   thinkingLevel?: ThinkLevel,
   agentId?: string,
+  modelApi?: string,
 ): void {
   const resolvedExtraParams = resolveExtraParams({
     cfg,
@@ -351,7 +414,7 @@ export function applyExtraParamsToAgent(
         )
       : undefined;
   const merged = Object.assign({}, resolvedExtraParams, override);
-  const wrappedStreamFn = createStreamFnWithExtraParams(agent.streamFn, merged, provider);
+  const wrappedStreamFn = createStreamFnWithExtraParams(agent.streamFn, merged, provider, modelApi);
 
   if (wrappedStreamFn) {
     log.debug(`applying extraParams to agent streamFn for ${provider}/${modelId}`);
